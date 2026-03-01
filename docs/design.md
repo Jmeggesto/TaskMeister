@@ -7,13 +7,13 @@ TaskMeister/
 ├── backend/
 │   ├── src/TaskMeisterAPI/
 │   │   ├── Configuration/        Strongly-typed options (JwtOptions, DatabaseOptions, …)
-│   │   ├── Controllers/          TodosController, UsersController
+│   │   ├── Controllers/          HTTP Controllers to handle request/response layer
 │   │   ├── Data/                 AppDbContext (EF Core + SQLite)
 │   │   ├── Infrastructure/
 │   │   │   ├── Auth/             JWT current-user resolution, token validation
 │   │   │   └── ModelBinding/     [FromUser] model binder
-│   │   ├── Models/               TodoItem, User, request/response types
-│   │   ├── Services/             ITodoService, IUserService
+│   │   ├── Models/               DB entities, request objects, response classes
+│   │   ├── Services/             Service layer to perform business logic
 │   │   └── Program.cs            App entry point & DI setup
 │   └── tests/TaskMeisterAPI.Tests/
 │       ├── Integration/          WebApplicationFactory-based API tests
