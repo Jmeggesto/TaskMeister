@@ -19,6 +19,7 @@ public class UserService : IUserService
     private readonly AppDbContext _db;
     private readonly JwtOptions _jwt;
     private readonly SigningCredentials _signingCredentials;
+    private readonly ILogger<UserService> _logger;
 
     private static readonly JwtSecurityTokenHandler _tokenHandler = new();
 
@@ -28,10 +29,11 @@ public class UserService : IUserService
     private const int Iterations = 310_000;
     private static readonly HashAlgorithmName HashAlgorithm = HashAlgorithmName.SHA256;
 
-    public UserService(AppDbContext db, IOptions<JwtOptions> jwtOptions)
+    public UserService(AppDbContext db, IOptions<JwtOptions> jwtOptions, ILogger<UserService> logger)
     {
         _db = db;
         _jwt = jwtOptions.Value;
+        _logger = logger;
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.SecretKey));
         _signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
     }
@@ -39,10 +41,16 @@ public class UserService : IUserService
     public async Task<ErrorOr<AuthResponse>> SignupAsync(SignupRequest request)
     {
         if (await _db.Users.AnyAsync(u => u.Name == request.Name))
+        {
+            _logger.LogWarning("Signup rejected: duplicate username.");
             return Error.Conflict("User.DuplicateName", "A user with that name already exists.");
+        }
 
         if (await _db.Users.AnyAsync(u => u.Email == request.Email))
+        {
+            _logger.LogWarning("Signup rejected: duplicate email.");
             return Error.Conflict("User.DuplicateEmail", "An account with that email already exists.");
+        }
 
         var now = DateTime.UtcNow;
         var user = new User
@@ -65,9 +73,11 @@ public class UserService : IUserService
             // A concurrent request beat us past the AnyAsync checks and inserted
             // the same name or email first. The unique DB index enforces the
             // constraint; we just need to surface it as a 409 rather than a 500.
+            _logger.LogWarning("Signup race condition: concurrent duplicate detected.");
             return Error.Conflict("User.DuplicateEntry", "An account with that name or email already exists.");
         }
 
+        _logger.LogInformation("New user registered. UserId={UserId}", user.Id);
         return BuildAuthResponse(user);
     }
 
@@ -83,11 +93,15 @@ public class UserService : IUserService
         if (user is null)
         {
             DeriveHash(request.Password, new byte[SaltSize]);
+            _logger.LogWarning("Failed login: email not found.");
             return Error.Unauthorized("User.InvalidCredentials", "Invalid email or password.");
         }
 
         if (!VerifyPassword(request.Password, user.Password))
+        {
+            _logger.LogWarning("Failed login: incorrect password. UserId={UserId}", user.Id);
             return Error.Unauthorized("User.InvalidCredentials", "Invalid email or password.");
+        }
 
         return BuildAuthResponse(user);
     }
@@ -97,11 +111,16 @@ public class UserService : IUserService
         var user = await _db.Users.FindAsync(currentUser.Id);
 
         if (user is null)
+        {
+            _logger.LogWarning(
+                "Logout: user not found in database. UserId={UserId}", currentUser.Id);
             return Error.NotFound("User.NotFound", "User not found.");
+        }
 
         user.TokenVersion++;
         await _db.SaveChangesAsync();
 
+        _logger.LogInformation("User logged out. UserId={UserId}", user.Id);
         return Result.Success;
     }
 
@@ -150,7 +169,7 @@ public class UserService : IUserService
                 new Claim(AppClaims.TokenVersion, user.TokenVersion.ToString()),
                 new Claim(AppClaims.UserId, user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Name, user.Name),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),                
+                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             ],
             notBefore: now,
             expires: expiresAt,

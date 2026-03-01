@@ -1,18 +1,18 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using TaskMeisterAPI.Configuration;
 using TaskMeisterAPI.Data;
-using TaskMeisterAPI.Services;
 using TaskMeisterAPI.Infrastructure.Auth;
 using TaskMeisterAPI.Infrastructure.ModelBinding;
+using TaskMeisterAPI.Services;
 
 public class Program
 {
@@ -223,6 +223,23 @@ public class Program
 
     private static void ConfigurePipeline(WebApplication app)
     {
+        // Catch any exception that escapes the service/controller layer and return
+        // a clean JSON 500 rather than a raw HTML error page. Placed first so it
+        // wraps the entire remaining pipeline.
+        app.UseExceptionHandler(errApp => errApp.Run(async context =>
+        {
+            var logger  = context.RequestServices.GetRequiredService<ILogger<Program>>();
+            var feature = context.Features.Get<IExceptionHandlerFeature>();
+            logger.LogError(feature?.Error, "Unhandled exception.");
+
+            context.Response.StatusCode  = StatusCodes.Status500InternalServerError;
+            context.Response.ContentType = "application/json";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "An unexpected error occurred."
+            });
+        }));
+
         if (app.Environment.IsDevelopment())
         {
             app.UseSwagger();
