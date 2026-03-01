@@ -30,10 +30,10 @@ public static class TestAuthHelper
             audience: TestJwt.Audience,
             claims:
             [
-                new Claim(JwtRegisteredClaimNames.Sub,  userId.ToString()),
+                new Claim(AppClaims.UserId,             userId.ToString()),
+                new Claim(AppClaims.TokenVersion,       tokenVersion.ToString()),
                 new Claim(JwtRegisteredClaimNames.Name, userName),
                 new Claim(JwtRegisteredClaimNames.Jti,  Guid.NewGuid().ToString()),
-                new Claim(AppClaims.TokenVersion,       tokenVersion.ToString()),
             ],
             notBefore:          now,
             expires:            now.AddMinutes(TestJwt.ExpiryMinutes),
@@ -60,10 +60,10 @@ public static class TestAuthHelper
             audience: TestJwt.Audience,
             claims:
             [
-                new Claim(JwtRegisteredClaimNames.Sub,  userId.ToString()),
+                new Claim(AppClaims.UserId,             userId.ToString()),
+                new Claim(AppClaims.TokenVersion,       tokenVersion.ToString()),
                 new Claim(JwtRegisteredClaimNames.Name, userName),
                 new Claim(JwtRegisteredClaimNames.Jti,  Guid.NewGuid().ToString()),
-                new Claim(AppClaims.TokenVersion,       tokenVersion.ToString()),
             ],
             notBefore:          past,
             expires:            past.AddMinutes(30),
