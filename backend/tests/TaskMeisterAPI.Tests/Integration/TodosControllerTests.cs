@@ -12,20 +12,15 @@ namespace TaskMeisterAPI.Tests.Integration;
 /// <summary>
 /// Integration tests for the Todos HTTP API.
 ///
-/// xUnit creates a fresh class instance per test method, so each test gets its own
-/// TestWebApplicationFactory (and its own isolated in-memory database).
+/// IAsyncLifetime.InitializeAsync seeds a test user into the in-memory database
+/// and sets the authenticated client's default Authorization header before each
+/// test method runs.  xUnit creates a fresh class instance per test, so each
+/// test gets its own factory, database, and authenticated client.
 /// </summary>
-public class TodosControllerTests : IDisposable
+public class TodosControllerTests : IAsyncLifetime
 {
     private readonly TestWebApplicationFactory _factory;
     private readonly HttpClient                _client;
-
-    // JSON options matching the app's JsonStringEnumConverter(SnakeCaseLower) setting.
-    private static readonly JsonSerializerOptions JsonOpts = new()
-    {
-        PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(JsonNamingPolicy.SnakeCaseLower) },
-    };
 
     public TodosControllerTests()
     {
@@ -33,10 +28,33 @@ public class TodosControllerTests : IDisposable
         _client  = _factory.CreateClient();
     }
 
-    public void Dispose()
+    public async Task InitializeAsync()
+    {
+        // Seed a test user so OnTokenValidated can find them in the DB,
+        // then wire up the default auth header for all subsequent requests.
+        await _factory.SeedAsync(async db =>
+        {
+            var user = new User
+            {
+                Name      = "Test User",
+                Email     = "test@example.com",
+                Password  = "hashed",
+                CreatedOn = DateTime.UtcNow,
+                UpdatedOn = DateTime.UtcNow,
+            };
+            db.Users.Add(user);
+            await db.SaveChangesAsync(); // user.Id is populated by EF after this call
+
+            var token = TestAuthHelper.GenerateToken(user.Id, user.Name, user.TokenVersion);
+            _client.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader(token);
+        });
+    }
+
+    public Task DisposeAsync()
     {
         _client.Dispose();
         _factory.Dispose();
+        return Task.CompletedTask;
     }
 
     // -------------------------------------------------------------------------
@@ -49,6 +67,53 @@ public class TodosControllerTests : IDisposable
         resp.StatusCode.Should().Be(HttpStatusCode.Created);
         var body = await resp.Content.ReadAsStringAsync();
         return JsonDocument.Parse(body).RootElement;
+    }
+
+    // Returns a fresh client with no Authorization header for testing 401 paths.
+    private HttpClient AnonClient() => _factory.CreateClient();
+
+    // -------------------------------------------------------------------------
+    // Auth enforcement — all endpoints must reject unauthenticated requests
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAll_Returns401_WhenNotAuthenticated()
+    {
+        using var client = AnonClient();
+        var resp = await client.GetAsync("/api/todos");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetById_Returns401_WhenNotAuthenticated()
+    {
+        using var client = AnonClient();
+        var resp = await client.GetAsync("/api/todos/1");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Create_Returns401_WhenNotAuthenticated()
+    {
+        using var client = AnonClient();
+        var resp = await client.PostAsJsonAsync("/api/todos", new { title = "Ghost" });
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Update_Returns401_WhenNotAuthenticated()
+    {
+        using var client = AnonClient();
+        var resp = await client.PutAsJsonAsync("/api/todos/1", new { title = "Ghost", status = "done" });
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Delete_Returns401_WhenNotAuthenticated()
+    {
+        using var client = AnonClient();
+        var resp = await client.DeleteAsync("/api/todos/1");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     // -------------------------------------------------------------------------
@@ -68,24 +133,23 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task GetAll_Returns200_WithAllCreatedTodos()
     {
-        await _client.PostAsJsonAsync("/api/todos", new { title = "A" });
-        await _client.PostAsJsonAsync("/api/todos", new { title = "B" });
-        await _client.PostAsJsonAsync("/api/todos", new { title = "C" });
+        await PostTodoAsync("A");
+        await PostTodoAsync("B");
+        await PostTodoAsync("C");
 
         var resp = await _client.GetAsync("/api/todos");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var content = await resp.Content.ReadAsStringAsync();
-        var items = JsonSerializer.Deserialize<JsonElement[]>(content)!;
+        var items = JsonSerializer.Deserialize<JsonElement[]>(await resp.Content.ReadAsStringAsync())!;
         items.Should().HaveCount(3);
     }
 
     [Fact]
     public async Task GetAll_ReturnsTodos_OrderedNewestFirst()
     {
-        await _client.PostAsJsonAsync("/api/todos", new { title = "First" });
-        await _client.PostAsJsonAsync("/api/todos", new { title = "Second" });
-        await _client.PostAsJsonAsync("/api/todos", new { title = "Third" });
+        await PostTodoAsync("First");
+        await PostTodoAsync("Second");
+        await PostTodoAsync("Third");
 
         var resp  = await _client.GetAsync("/api/todos");
         var items = JsonSerializer.Deserialize<JsonElement[]>(await resp.Content.ReadAsStringAsync())!;
@@ -98,7 +162,7 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task GetAll_SerializesStatus_AsSnakeCaseString()
     {
-        await _client.PostAsJsonAsync("/api/todos", new { title = "Status check" });
+        await PostTodoAsync("Status check");
 
         var resp = await _client.GetAsync("/api/todos");
         var body = await resp.Content.ReadAsStringAsync();
@@ -108,6 +172,31 @@ public class TodosControllerTests : IDisposable
         body.Should().NotContain("NotStarted");
     }
 
+    [Fact]
+    public async Task GetAll_ReturnsOnlyCurrentUsersTodos()
+    {
+        // Create a todo as the primary authenticated user.
+        await PostTodoAsync("Primary user's todo");
+
+        // Sign up a second user through the API and get their token.
+        var signupResp = await _factory.CreateClient().PostAsJsonAsync("/api/users/signup",
+            new { name = "Other User", email = "other@example.com", password = "SecurePass123!" });
+        var signupDoc = JsonDocument.Parse(await signupResp.Content.ReadAsStringAsync()).RootElement;
+        var otherToken = signupDoc.GetProperty("token").GetString()!;
+
+        // Create a todo as the second user.
+        using var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader(otherToken);
+        await otherClient.PostAsJsonAsync("/api/todos", new { title = "Other user's todo" });
+
+        // The primary user should only see their own todo.
+        var resp  = await _client.GetAsync("/api/todos");
+        var items = JsonSerializer.Deserialize<JsonElement[]>(await resp.Content.ReadAsStringAsync())!;
+
+        items.Should().HaveCount(1);
+        items[0].GetProperty("title").GetString().Should().Be("Primary user's todo");
+    }
+
     // -------------------------------------------------------------------------
     // GET /api/todos/{id}
     // -------------------------------------------------------------------------
@@ -115,8 +204,9 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task GetById_Returns200_WithCorrectTodo()
     {
-        var todo   = await PostTodoAsync("Get by id");
-        var id     = todo.GetProperty("id").GetInt32();
+        var todo = await PostTodoAsync("Get by id");
+        var id   = todo.GetProperty("id").GetInt32();
+
         var resp = await _client.GetAsync($"/api/todos/{id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -138,13 +228,34 @@ public class TodosControllerTests : IDisposable
         await PostTodoAsync("One");
         await PostTodoAsync("Two");
         var todo = await PostTodoAsync("Three");
-        var id = todo.GetProperty("id").GetInt32();
+        var id   = todo.GetProperty("id").GetInt32();
 
         var resp = await _client.GetAsync($"/api/todos/{id}");
         var doc  = JsonDocument.Parse(await resp.Content.ReadAsStringAsync()).RootElement;
 
         doc.GetProperty("id").GetInt32().Should().Be(id);
         doc.GetProperty("title").GetString().Should().Be("Three");
+    }
+
+    [Fact]
+    public async Task GetById_Returns404_WhenTodoBelongsToAnotherUser()
+    {
+        // Sign up a second user and create a todo as them.
+        var signupResp = await _factory.CreateClient().PostAsJsonAsync("/api/users/signup",
+            new { name = "Other User", email = "other@example.com", password = "SecurePass123!" });
+        var otherToken = JsonDocument.Parse(await signupResp.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("token").GetString()!;
+
+        using var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader(otherToken);
+        var otherTodo = JsonDocument.Parse(
+            await (await otherClient.PostAsJsonAsync("/api/todos", new { title = "Not yours" }))
+                .Content.ReadAsStringAsync()).RootElement;
+        var otherId = otherTodo.GetProperty("id").GetInt32();
+
+        // The primary user should not be able to access the other user's todo.
+        var resp = await _client.GetAsync($"/api/todos/{otherId}");
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // -------------------------------------------------------------------------
@@ -184,8 +295,9 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task Create_PersistedToDatabase_VerifiedByGetById()
     {
-        var todo   = await PostTodoAsync("Persist test");
-        var id = todo.GetProperty("id").GetInt32();
+        var todo = await PostTodoAsync("Persist test");
+        var id   = todo.GetProperty("id").GetInt32();
+
         var resp = await _client.GetAsync($"/api/todos/{id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -198,8 +310,9 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task Update_Returns200_WithUpdatedValues()
     {
-        var todo   = await PostTodoAsync("Original");
-        var id = todo.GetProperty("id").GetInt32();
+        var todo = await PostTodoAsync("Original");
+        var id   = todo.GetProperty("id").GetInt32();
+
         var resp = await _client.PutAsJsonAsync($"/api/todos/{id}",
             new { title = "Updated", status = "in_progress" });
 
@@ -222,7 +335,7 @@ public class TodosControllerTests : IDisposable
     public async Task Update_CanTransitionStatusToAllValues()
     {
         var todo = await PostTodoAsync("Transitions");
-        var id = todo.GetProperty("id").GetInt32();
+        var id   = todo.GetProperty("id").GetInt32();
 
         foreach (var status in new[] { "in_progress", "done", "not_started" })
         {
@@ -239,7 +352,7 @@ public class TodosControllerTests : IDisposable
     public async Task Update_PersistsChanges_VerifiedByGetById()
     {
         var todo = await PostTodoAsync("Before update");
-        var id = todo.GetProperty("id").GetInt32();
+        var id   = todo.GetProperty("id").GetInt32();
 
         await _client.PutAsJsonAsync($"/api/todos/{id}",
             new { title = "After update", status = "done" });
@@ -250,6 +363,28 @@ public class TodosControllerTests : IDisposable
         doc.GetProperty("status").GetString().Should().Be("done");
     }
 
+    [Fact]
+    public async Task Update_Returns404_WhenTodoBelongsToAnotherUser()
+    {
+        // Create a todo as a second user.
+        var signupResp = await _factory.CreateClient().PostAsJsonAsync("/api/users/signup",
+            new { name = "Other User", email = "other@example.com", password = "SecurePass123!" });
+        var otherToken = JsonDocument.Parse(await signupResp.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("token").GetString()!;
+
+        using var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader(otherToken);
+        var otherTodo = JsonDocument.Parse(
+            await (await otherClient.PostAsJsonAsync("/api/todos", new { title = "Not yours" }))
+                .Content.ReadAsStringAsync()).RootElement;
+        var otherId = otherTodo.GetProperty("id").GetInt32();
+
+        // The primary user should not be able to update the other user's todo.
+        var resp = await _client.PutAsJsonAsync($"/api/todos/{otherId}",
+            new { title = "Hijacked", status = "done" });
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
     // -------------------------------------------------------------------------
     // DELETE /api/todos/{id}
     // -------------------------------------------------------------------------
@@ -257,8 +392,9 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task Delete_Returns204NoContent_WhenIdExists()
     {
-        var todo   = await PostTodoAsync("Delete me");
-        var id = todo.GetProperty("id").GetInt32();
+        var todo = await PostTodoAsync("Delete me");
+        var id   = todo.GetProperty("id").GetInt32();
+
         var resp = await _client.DeleteAsync($"/api/todos/{id}");
 
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -275,27 +411,48 @@ public class TodosControllerTests : IDisposable
     public async Task Delete_RemovesItem_VerifiedByGetById()
     {
         var todo = await PostTodoAsync("Gone after delete");
-        var id = todo.GetProperty("id").GetInt32();
+        var id   = todo.GetProperty("id").GetInt32();
 
         await _client.DeleteAsync($"/api/todos/{id}");
-        var resp = await _client.GetAsync($"/api/todos/{id}");
 
+        var resp = await _client.GetAsync($"/api/todos/{id}");
         resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
     public async Task Delete_DoesNotAffectOtherTodos()
     {
-        var todoKeep   = await PostTodoAsync("Keep");
-        var todoRemove = await PostTodoAsync("Remove");
+        var keep   = await PostTodoAsync("Keep");
+        var remove = await PostTodoAsync("Remove");
 
-        var idKeep = todoKeep.GetProperty("id").GetInt32();
-        var idRemove = todoRemove.GetProperty("id").GetInt32();
+        var idKeep   = keep.GetProperty("id").GetInt32();
+        var idRemove = remove.GetProperty("id").GetInt32();
 
         await _client.DeleteAsync($"/api/todos/{idRemove}");
 
-        var keepResp = await _client.GetAsync($"/api/todos/{idKeep}");
-        keepResp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var resp = await _client.GetAsync($"/api/todos/{idKeep}");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Delete_Returns404_WhenTodoBelongsToAnotherUser()
+    {
+        // Create a todo as a second user.
+        var signupResp = await _factory.CreateClient().PostAsJsonAsync("/api/users/signup",
+            new { name = "Other User", email = "other@example.com", password = "SecurePass123!" });
+        var otherToken = JsonDocument.Parse(await signupResp.Content.ReadAsStringAsync())
+            .RootElement.GetProperty("token").GetString()!;
+
+        using var otherClient = _factory.CreateClient();
+        otherClient.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader(otherToken);
+        var otherTodo = JsonDocument.Parse(
+            await (await otherClient.PostAsJsonAsync("/api/todos", new { title = "Not yours" }))
+                .Content.ReadAsStringAsync()).RootElement;
+        var otherId = otherTodo.GetProperty("id").GetInt32();
+
+        // The primary user should not be able to delete the other user's todo.
+        var resp = await _client.DeleteAsync($"/api/todos/{otherId}");
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     // -------------------------------------------------------------------------
@@ -305,8 +462,9 @@ public class TodosControllerTests : IDisposable
     [Fact]
     public async Task Response_TodoItem_HasExpectedFields()
     {
-        var todo   = await PostTodoAsync("Shape check");
-        var id     = todo.GetProperty("id").GetInt32();
+        var todo = await PostTodoAsync("Shape check");
+        var id   = todo.GetProperty("id").GetInt32();
+
         var resp = await _client.GetAsync($"/api/todos/{id}");
         var doc  = JsonDocument.Parse(await resp.Content.ReadAsStringAsync()).RootElement;
 

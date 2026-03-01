@@ -16,9 +16,9 @@ using TaskMeisterAPI.Infrastructure.ModelBinding;
 
 public class Program
 {
-    public static void Main(string[] args) => new Program().Run(args);
+    private const string CorsPolicyName = "AppCors";
 
-    public void Run(string[] args)
+    private static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -30,7 +30,7 @@ public class Program
 
         var app = builder.Build();
 
-        InitialiseDatabase(app);
+        InitializeDatabase(app);
         ConfigurePipeline(app);
 
         app.Run();
@@ -59,10 +59,6 @@ public class Program
             .Bind(builder.Configuration.GetSection(JwtOptions.SectionName))
             .ValidateDataAnnotations()
             .ValidateOnStart();
-
-        builder.Services.AddHttpContextAccessor();
-        builder.Services.AddScoped<ICurrentUser, CurrentUser>();           
-        builder.Services.AddScoped<RequireUserFilter>(); 
     }
 
     private static void ConfigureDatabase(WebApplicationBuilder builder)
@@ -77,6 +73,10 @@ public class Program
 
     private static void ConfigureServices(WebApplicationBuilder builder)
     {
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+        builder.Services.AddScoped<RequireUserFilter>();
+
         builder.Services.AddScoped<ITodoService, TodoService>();
         builder.Services.AddScoped<IUserService, UserService>();
         builder.Services.AddScoped<ITokenValidator, TokenVersionValidator>();
@@ -90,7 +90,9 @@ public class Program
             {
                 var jwtOptions = builder.Configuration
                     .GetSection(JwtOptions.SectionName)
-                    .Get<JwtOptions>()!;
+                    .Get<JwtOptions>()
+                    ?? throw new InvalidOperationException(
+                        $"Missing required configuration section '{JwtOptions.SectionName}'.");
 
                 options.TokenValidationParameters = new TokenValidationParameters
                 {
@@ -110,23 +112,26 @@ public class Program
 
                 options.Events = new JwtBearerEvents
                 {
-                    OnTokenValidated = async context =>
-                    {
-                        var validator = context.HttpContext.RequestServices.GetRequiredService<ITokenValidator>();
-                        var userIdClaim = context.Principal?.FindFirstValue(AppClaims.UserId);
-                        var versionClaim = context.Principal?.FindFirstValue(AppClaims.TokenVersion);
-                        
-                        if (!int.TryParse(userIdClaim, out var userId) ||
-                            !int.TryParse(versionClaim, out var tokenVersion) ||
-                            !await validator.IsTokenValidAsync(userId, tokenVersion))
-                        {
-                            context.Fail("Token is invalid or has been revoked.");
-                        }
-                    }
+                    OnTokenValidated = ValidateTokenVersion
                 };
             });
 
         builder.Services.AddAuthorization();
+    }
+
+    private static async Task ValidateTokenVersion(TokenValidatedContext context)
+    {
+        var validator = context.HttpContext.RequestServices
+            .GetRequiredService<ITokenValidator>();
+        var userIdClaim  = context.Principal?.FindFirstValue(AppClaims.UserId);
+        var versionClaim = context.Principal?.FindFirstValue(AppClaims.TokenVersion);
+
+        if (!int.TryParse(userIdClaim,  out var userId)       ||
+            !int.TryParse(versionClaim, out var tokenVersion) ||
+            !await validator.IsTokenValidAsync(userId, tokenVersion))
+        {
+            context.Fail("Token is invalid or has been revoked.");
+        }
     }
 
     private static void ConfigureWeb(WebApplicationBuilder builder)
@@ -190,7 +195,7 @@ public class Program
 
         builder.Services.AddCors(options =>
         {
-            options.AddPolicy("AppCors", policy =>
+            options.AddPolicy(CorsPolicyName, policy =>
                 policy.WithOrigins(allowedOrigins)
                       .AllowAnyHeader()
                       .AllowAnyMethod());
@@ -201,7 +206,7 @@ public class Program
     // App pipeline
     // ---------------------------------------------------------------------------
 
-    private static void InitialiseDatabase(WebApplication app)
+    private static void InitializeDatabase(WebApplication app)
     {
         // In the Test environment the DbContext uses an InMemory database which is
         // created automatically on first access — EnsureCreated() is not needed and
@@ -224,7 +229,7 @@ public class Program
             app.UseSwaggerUI();
         }
 
-        app.UseCors("AppCors");
+        app.UseCors(CorsPolicyName);
         app.UseAuthentication();
         app.UseAuthorization();
         app.MapControllers();
