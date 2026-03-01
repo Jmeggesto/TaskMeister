@@ -23,7 +23,7 @@ public class TodosController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll([FromUser] User currentUser)
     {
-        var todos = await _todoService.GetAllAsync();
+        var todos = await _todoService.GetAllForUserAsync(currentUser);
         return Ok(todos);
     }
 
@@ -31,7 +31,7 @@ public class TodosController : ControllerBase
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id, [FromUser] User currentUser)
     {
-        var todo = await _todoService.GetByIdAsync(id);
+        var todo = await _todoService.GetByIdForUserAsync(id, currentUser);
         return todo is null ? NotFound() : Ok(todo);
     }
 
@@ -42,7 +42,7 @@ public class TodosController : ControllerBase
         [FromUser] User currentUser
     )
     {
-        var todo = await _todoService.CreateAsync(request.Title);
+        var todo = await _todoService.CreateForUserAsync(request.Title, currentUser);
         return CreatedAtAction(nameof(GetById), new { id = todo.Id }, todo);
     }
 
@@ -54,7 +54,7 @@ public class TodosController : ControllerBase
         [FromUser] User currentUser
     )
     {
-        var todo = await _todoService.UpdateAsync(id, request.Title, request.Status);
+        var todo = await _todoService.UpdateForUserAsync(id, request.Title, request.Status, currentUser);
         return todo is null ? NotFound() : Ok(todo);
     }
 
@@ -62,7 +62,7 @@ public class TodosController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(int id, [FromUser] User currentUser)
     {
-        var deleted = await _todoService.DeleteAsync(id);
+        var deleted = await _todoService.DeleteForUserAsync(id, currentUser);
         return deleted ? NoContent() : NotFound();
     }
 }

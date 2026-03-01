@@ -4,9 +4,9 @@ namespace TaskMeisterAPI.Services;
 
 public interface ITodoService
 {
-    Task<IReadOnlyList<TodoItem>> GetAllAsync();
-    Task<TodoItem?> GetByIdAsync(int id);
-    Task<TodoItem> CreateAsync(string title);
-    Task<TodoItem?> UpdateAsync(int id, string title, TodoStatus status);
-    Task<bool> DeleteAsync(int id);
+    Task<IReadOnlyList<TodoItem>> GetAllForUserAsync(User user);
+    Task<TodoItem?> GetByIdForUserAsync(int id, User user);
+    Task<TodoItem> CreateForUserAsync(string title, User user);
+    Task<TodoItem?> UpdateForUserAsync(int id, string title, TodoStatus status, User user);
+    Task<bool> DeleteForUserAsync(int id, User user);
 }
