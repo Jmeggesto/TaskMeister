@@ -152,7 +152,7 @@ public class UserServiceTests
         var handler = new JwtSecurityTokenHandler();
         var jwt     = handler.ReadJwtToken(result.Value.Token);
 
-        jwt.Subject.Should().NotBeNullOrEmpty();                         // sub
+        jwt.Claims.Should().Contain(c => c.Type == AppClaims.UserId);      // sub
         jwt.Claims.Should().Contain(c => c.Type == "name");              // name
         jwt.Claims.Should().Contain(c => c.Type == AppClaims.TokenVersion); // tok_ver
         jwt.Id.Should().NotBeNullOrEmpty();                              // jti
