@@ -1,0 +1,93 @@
+# ══════════════════════════════════════════════════════════════════════════════
+#  TaskMeister — root .gitignore
+#  Covers: .NET 10, React + Vite + TypeScript, SQLite, Docker, common editors
+# ══════════════════════════════════════════════════════════════════════════════
+
+
+# ── Secrets & local env overrides ─────────────────────────────────────────────
+# .env.example is committed; all actual .env files are not.
+**/.env
+**/.env.local
+**/.env.*.local
+
+
+# ── SQLite databases ───────────────────────────────────────────────────────────
+*.db
+*.db-shm
+*.db-wal
+
+
+# ── .NET build artifacts ───────────────────────────────────────────────────────
+**/bin/
+**/obj/
+
+# NuGet
+*.nupkg
+*.snupkg
+**/packages/
+!**/packages/build/            # MSBuild integration packages are sometimes committed
+
+# Publish output
+**/publish/
+
+# User-specific & IDE files
+*.user
+*.userosscache
+*.sln.docstates
+.vs/
+
+# dotnet user-secrets (stored outside the repo by default; ignore if ever local)
+**/secrets.json
+
+# ASP.NET scaffolding
+ScaffoldingReadMe.txt
+
+# Entity Framework migrations snapshot (only if you prefer clean diffs; remove
+# this line if you DO want to track snapshots)
+# **/Migrations/*Snapshot.cs
+
+
+# ── Node / npm ─────────────────────────────────────────────────────────────────
+**/node_modules/
+
+# npm / yarn / pnpm debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Generic log dirs
+logs/
+*.log
+
+
+# ── Vite / TypeScript build output ────────────────────────────────────────────
+**/dist/
+**/dist-ssr/
+
+# tsbuildinfo (incremental compile cache)
+*.tsbuildinfo
+
+
+# ── OS clutter ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# ── Editors ───────────────────────────────────────────────────────────────────
+# VS Code — keep extensions.json if present; ignore everything else
+.vscode/*
+!.vscode/extensions.json
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.iml
+
+# Vim / Neovim swap files
+*.sw?
+
+# Emacs
+*~
+\#*\#

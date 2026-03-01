@@ -1,0 +1,28 @@
+# ── Version control ───────────────────────────────────────────────────────────
+.git
+.gitignore
+
+# ── Secrets (never bake into an image) ────────────────────────────────────────
+.env
+**/*.pfx
+**/*.key
+
+# ── Backend build artifacts ───────────────────────────────────────────────────
+backend/src/**/bin/
+backend/src/**/obj/
+backend/tests/
+
+# ── Frontend build artifacts & local modules ──────────────────────────────────
+frontend/node_modules/
+frontend/dist/
+
+# ── IDE / OS clutter ──────────────────────────────────────────────────────────
+.vs/
+.vscode/
+**/.DS_Store
+**/Thumbs.db
+
+# ── Docker files themselves (no need inside the image) ────────────────────────
+**/Dockerfile
+docker-compose*.yml
+.dockerignore

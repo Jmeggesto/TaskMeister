@@ -1,0 +1,12 @@
+/* Ensure the root element fills the viewport so flex centering works on the landing page */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Font smoothing baseline — everything else lives in App.css */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

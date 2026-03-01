@@ -1,0 +1,40 @@
+services:
+
+  # ── .NET 10 API ─────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: .                        # repo root — both Dockerfiles COPY relative paths from here
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    expose:
+      - "5276"                          # reachable by nginx inside the compose network; not published to host
+    volumes:
+      - taskmeister-data:/data          # SQLite database persists here across restarts
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+
+      # Database — point SQLite at the persistent volume
+      Database__ConnectionString: "Data Source=/data/todos.db"
+
+      # JWT — double-underscore maps to nested JSON keys in .NET config
+      Jwt__Issuer:        TaskMeister
+      Jwt__Audience:      TaskMeister
+      Jwt__ExpiryMinutes: "60"
+      Jwt__SecretKey:     "${JWT_SECRET_KEY}"   # required — set in .env or shell
+
+      # CORS — allow requests from the frontend origin
+      App__AllowedOrigins__0: "${FRONTEND_ORIGIN:-http://localhost}"
+
+  # ── Vite build → nginx ──────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-80}:80"       # default http://localhost — override with FRONTEND_PORT=3000
+    depends_on:
+      - backend
+
+volumes:
+  taskmeister-data:                     # named volume so Docker manages its lifecycle

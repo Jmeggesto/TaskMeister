@@ -1,0 +1,390 @@
+/* ─── Reset & base ─────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #1a1a1a;
+  background: #f4f4f5;
+  min-height: 100vh;
+}
+
+/* ─── Shared utilities ─────────────────────────────────────────────── */
+.btn-primary {
+  display: block;
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: #2563eb;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-primary:hover:not(:disabled) { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+.btn-link:hover { color: #1d4ed8; }
+
+.form-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+/* ─── Landing page ─────────────────────────────────────────────────── */
+.landing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+.landing-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.landing-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: -0.03em;
+}
+
+.landing-subtitle {
+  text-align: center;
+  color: #71717a;
+  font-size: 0.95rem;
+  margin-top: -0.75rem;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #3f3f46;
+}
+
+.field input {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d4d4d8;
+  border-radius: 6px;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.field input:focus { border-color: #2563eb; }
+
+.mode-toggle {
+  text-align: center;
+  font-size: 0.875rem;
+  color: #71717a;
+}
+
+/* ─── Todos page shell ─────────────────────────────────────────────── */
+.todos-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.todos-header {
+  background: #fff;
+  border-bottom: 1px solid #e4e4e7;
+  padding: 0 1.5rem;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.todos-header h1 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.username { color: #71717a; }
+
+.todos-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.5rem 0;
+  gap: 0.75rem;
+  min-height: 0;
+}
+
+.status-message {
+  text-align: center;
+  color: #71717a;
+  padding: 2rem;
+}
+
+/* ─── Kanban board ─────────────────────────────────────────────────── */
+.kanban-board {
+  display: flex;
+  gap: 1.25rem;
+  flex: 1;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 1.5rem;
+}
+
+/* ─── Kanban column ────────────────────────────────────────────────── */
+.kanban-column {
+  flex: 1;
+  min-width: 260px;
+  max-width: 380px;
+  background: #ebebed;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.kanban-column.is-over {
+  background: #dbeafe;
+  box-shadow: 0 0 0 2px #2563eb;
+}
+
+.kanban-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem 0.625rem;
+}
+
+.kanban-column-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #52525b;
+}
+
+.kanban-column-count {
+  background: #d4d4d8;
+  color: #52525b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.kanban-column-body {
+  flex: 1;
+  padding: 0.5rem 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  overflow-y: auto;
+}
+
+.kanban-column-empty {
+  text-align: center;
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  padding: 1.25rem 0.5rem;
+}
+
+/* ─── Todo card ────────────────────────────────────────────────────── */
+.todo-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.07);
+  cursor: grab;
+  user-select: none;
+  transition: transform 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.todo-card:hover {
+  box-shadow: 0 3px 8px rgba(0,0,0,0.10);
+}
+
+.todo-card:active { cursor: grabbing; }
+
+/* Ghost left behind while dragging */
+.todo-card.is-dragging {
+  opacity: 0.35;
+  box-shadow: none;
+}
+
+/* Floating clone rendered in DragOverlay */
+.todo-card.is-overlay {
+  cursor: grabbing;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  transform: scale(1.03);
+}
+
+.todo-card-title {
+  font-size: 0.92rem;
+  color: #1a1a1a;
+  line-height: 1.4;
+}
+
+/* ─── Inline add-todo form ─────────────────────────────────────────── */
+.kanban-add-area {
+  margin-top: 0.25rem;
+}
+
+.kanban-add-trigger {
+  width: 100%;
+  background: none;
+  border: none;
+  text-align: left;
+  color: #71717a;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.4rem 0.25rem;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+.kanban-add-trigger:hover {
+  color: #2563eb;
+  background: rgba(37,99,235,0.06);
+}
+
+.kanban-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.kanban-add-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  font-size: 0.92rem;
+  outline: none;
+  background: #fff;
+  transition: border-color 0.15s;
+  box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+}
+.kanban-add-input:focus { border-color: #2563eb; }
+
+.kanban-add-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.kanban-add-submit {
+  width: auto;
+  padding: 0.4rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* ─── Card action buttons (pencil + X) ─────────────────────────────── */
+
+/* Reveal row sits above the title — flex so pencil stays left, X right */
+.todo-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.35rem;
+  /* Hidden until card is hovered */
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.todo-card:hover .todo-card-actions {
+  opacity: 1;
+}
+
+/* Keep actions visible while the card is in edit mode */
+.todo-card.is-editing .todo-card-actions {
+  opacity: 1;
+}
+
+.todo-card-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  color: #a1a1aa;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.todo-card-btn--edit:hover {
+  color: #2563eb;
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.todo-card-btn--delete:hover {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+
+/* ─── Inline edit textarea ──────────────────────────────────────────── */
+.todo-card-input {
+  width: 100%;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid #93c5fd;
+  border-radius: 5px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  line-height: 1.4;
+  color: #1a1a1a;
+  background: #f0f7ff;
+  resize: none;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.10);
+  transition: border-color 0.15s;
+}
+
+.todo-card-input:focus {
+  border-color: #2563eb;
+}
+
+.todo-card-input:disabled {
+  opacity: 0.6;
+}
