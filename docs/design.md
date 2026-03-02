@@ -52,19 +52,3 @@ All `/api/todos` endpoints require a `Bearer` token (obtained from login).
 | DELETE | `/api/todos/{id}`  | ✓    | Delete a todo          |
 
 Todo status values: `not_started` · `in_progress` · `done`
-
----
-
-## Thought process, assumptions, and tradeoffs
-
-<!--
-    Fill this section in before submitting. Suggested topics:
-
-    - Why SQLite over EF Core in-memory
-    - Why JWT for auth, and the PBKDF2 password hashing choice
-    - Token storage (localStorage) — known tradeoff and what the production alternative would be
-    - What "production-ready MVP" meant for this project specifically
-    - Tradeoffs made (no pagination, no refresh tokens, no soft deletes, etc.)
-    - Scalability considerations
-    - What you would implement next given more time
--->

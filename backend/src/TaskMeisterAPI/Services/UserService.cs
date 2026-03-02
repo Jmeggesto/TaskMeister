@@ -26,7 +26,7 @@ public class UserService : IUserService
     // PBKDF2 parameters
     private const int SaltSize = 16;
     private const int HashSize = 32;
-    private const int Iterations = 310_000;
+    private const int Iterations = 600_000;
     private static readonly HashAlgorithmName HashAlgorithm = HashAlgorithmName.SHA256;
 
     public UserService(AppDbContext db, IOptions<JwtOptions> jwtOptions, ILogger<UserService> logger)
