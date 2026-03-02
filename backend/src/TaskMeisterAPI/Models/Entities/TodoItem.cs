@@ -13,4 +13,6 @@ public class TodoItem
     public string Title { get; set; } = string.Empty;
     public TodoStatus Status { get; set; } = TodoStatus.NotStarted;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

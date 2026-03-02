@@ -3,6 +3,7 @@ using ErrorOr;
 using FluentAssertions;
 using Xunit;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using TaskMeisterAPI.Configuration;
 using TaskMeisterAPI.Data;
@@ -30,7 +31,7 @@ public class UserServiceTests
             Audience      = TestJwt.Audience,
             SecretKey     = TestJwt.SecretKey,
             ExpiryMinutes = TestJwt.ExpiryMinutes,
-        }));
+        }), NullLogger<UserService>.Instance);
 
     private static SignupRequest ValidSignup(
         string name     = "alice",

@@ -34,6 +34,7 @@ public class TodoService : ITodoService
             Title = title,
             Status = TodoStatus.NotStarted,
             CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
             UserId = user.Id,
         };
 
@@ -50,6 +51,7 @@ public class TodoService : ITodoService
 
         item.Title = title;
         item.Status = status;
+        item.UpdatedAt = DateTime.UtcNow;
         await _db.SaveChangesAsync();
         return item;
     }
