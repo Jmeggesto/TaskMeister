@@ -181,6 +181,33 @@ public class TodoServiceTests
     }
 
     [Fact]
+    public async Task CreateForUserAsync_SetsUpdatedAt_ToNearCurrentUtc()
+    {
+        using var db = CreateDbContext();
+        var svc    = CreateService(db);
+        var user   = await CreateUserAsync(db);
+        var before = DateTime.UtcNow;
+
+        var result = await svc.CreateForUserAsync("Timestamp test", user);
+
+        result.UpdatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task CreateForUserAsync_SetsUpdatedAt_EqualToCreatedAt()
+    {
+        using var db = CreateDbContext();
+        var svc  = CreateService(db);
+        var user = await CreateUserAsync(db);
+
+        var result = await svc.CreateForUserAsync("New task", user);
+
+        // Both timestamps are assigned from the same DateTime.UtcNow call in the
+        // object initialiser, so they must be identical on a freshly created item.
+        result.UpdatedAt.Should().Be(result.CreatedAt);
+    }
+
+    [Fact]
     public async Task CreateForUserAsync_AssignsUserId()
     {
         using var db = CreateDbContext();
@@ -278,6 +305,33 @@ public class TodoServiceTests
 
         fetched!.Title.Should().Be("After");
         fetched.Status.Should().Be(TodoStatus.InProgress);
+    }
+
+    [Fact]
+    public async Task UpdateForUserAsync_SetsUpdatedAt_ToNearCurrentUtc()
+    {
+        using var db = CreateDbContext();
+        var svc    = CreateService(db);
+        var user   = await CreateUserAsync(db);
+        var item   = await svc.CreateForUserAsync("Original", user);
+        var before = DateTime.UtcNow;
+
+        var result = await svc.UpdateForUserAsync(item.Id, "Updated", TodoStatus.Done, user);
+
+        result!.UpdatedAt.Should().BeOnOrAfter(before).And.BeOnOrBefore(DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task UpdateForUserAsync_SetsUpdatedAt_OnOrAfterCreatedAt()
+    {
+        using var db = CreateDbContext();
+        var svc  = CreateService(db);
+        var user = await CreateUserAsync(db);
+        var item = await svc.CreateForUserAsync("Original", user);
+
+        var result = await svc.UpdateForUserAsync(item.Id, "Updated", TodoStatus.Done, user);
+
+        result!.UpdatedAt.Should().BeOnOrAfter(item.CreatedAt);
     }
 
     // -------------------------------------------------------------------------

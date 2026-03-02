@@ -93,6 +93,25 @@ public class TodosControllerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetAll_Returns401_WhenTokenIsMalformed()
+    {
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader("this.is.not.a.jwt");
+        var resp = await client.GetAsync("/api/todos");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetAll_Returns401_WhenTokenIsExpired()
+    {
+        using var client = _factory.CreateClient();
+        var expired = TestAuthHelper.GenerateExpiredToken(userId: 1, userName: "test");
+        client.DefaultRequestHeaders.Authorization = TestAuthHelper.AuthHeader(expired);
+        var resp = await client.GetAsync("/api/todos");
+        resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
     public async Task Create_Returns401_WhenNotAuthenticated()
     {
         using var client = AnonClient();
